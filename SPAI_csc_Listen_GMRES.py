@@ -16,21 +16,21 @@ import matplotlib.pyplot as plt
 
 
 
-def Start(Matrix_A,epsilon,max_fillin,case_Abbruchkriterium,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M):
+def Start(Matrix_A,epsilon,max_fillin,case_Abbruchkriterium,new_Indices,M_default,M):
     start_time = time.time()
 
     if(case_Abbruchkriterium == 0):                #case 0: nur Epsilon
-        [iterations,M] = start_case_0(Matrix_A,epsilon,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M)   
+        [iterations,M] = start_case_0(Matrix_A,epsilon,new_Indices,M_default,M)   
     elif(case_Abbruchkriterium == 1):                                         #case 1: nur max fill-in
-        [iterations,M] = start_case_1(Matrix_A,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M)
+        [iterations,M] = start_case_1(Matrix_A,max_fillin,new_Indices,M_default,M)
     elif((case_Abbruchkriterium == 2)):                                             #case 2: Epsilon und max fill-in
-        [iterations,M] = start_case_2(Matrix_A,epsilon,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M)
+        [iterations,M] = start_case_2(Matrix_A,epsilon,max_fillin,new_Indices,M_default,M)
     end_time = time.time()
     time_duration = end_time-start_time
         
     return [iterations,time_duration,M]
         
-def start_case_0(Matrix_A,epsilon,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M):
+def start_case_0(Matrix_A,epsilon,new_Indices,M_default,M):
     iterations = 0
     Dimension = Matrix_A.shape[0]
     [Positions_nonzero,Matrix_A] = positions_nonzeros(Matrix_A,Dimension)
@@ -39,27 +39,28 @@ def start_case_0(Matrix_A,epsilon,Anzahl_neue_Indizes_J_pro_Iteration,M_default,
         print(i,"---------------- --------- --------- --------- --------- --------- ---------")
         Simulation = True
         m = M_default.getcol(i)                         #m Defaultspalte
-        
+
         J = Initialize_J(m)                                                 #Menge J wird erstellt. In jedem i-Schritt anders, weil default-M unterschiedliche Spalten hat
         I = Initialize_I(Matrix_A,J,i)                                                     #Auf Basis der Menge J kann nun auch die Menge I initialisiert werden
         e_i_tilde = unit_vector_tilde(i,I)                                             #muss noch in die richtige Form gebracht werden, nur Indizes aus Menge I wichtig 
         [Q,R] = compute_QR_decomposition(I,J,Matrix_A)               #Einmal wird die große QR-Zerlegung berechnet
-        
+            
         m_tilde = R_backwards_solver(i,Q,R,len(J),I)
-        
+            
         residual = (Matrix_A[I,:])[:,J]@m_tilde - e_i_tilde        #evtl Matrix_A[I,J]@m und dann vom i-ten eintrag noch 1 abziehen für Effizienz
         current_residual = retransform_residual(residual,I,Dimension)
-        
+            
         current_norm_residual = np.linalg.norm(current_residual)
-        
+            
         iterations = iterations +1
         print(iterations)
         while((current_norm_residual > epsilon) and Simulation):                                   #neue Kandidaten für eine Expansion werden geschaffen
-            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,Anzahl_neue_Indizes_J_pro_Iteration,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
+            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,new_Indices,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
             I_tilde = set_I_tilde(Matrix_A,J_tilde,I,J)
             if(control_lists(I_tilde,J_tilde)):
                 [Q,R] = compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R)                              #Die neuen Bestandteile Q und R der QR-Zerlegung werden geupdatet (keine komplett neue QR-Zerlegung)
                 [I,J] = unite_sets(I,J,I_tilde,J_tilde)
+                #[Q,R] = compute_QR_decomposition(I,J,Matrix_A)
                 e_i_tilde = unit_vector_tilde(i,I)
                 m_tilde  = R_backwards_solver(i,Q,R,len(J),I)
                 residual = (Matrix_A[I,:])[:,J]@m_tilde - e_i_tilde          #evtl Matrix_A[I,J]@m und dann vom i-ten eintrag noch 1 abziehen für Effizienz
@@ -72,7 +73,7 @@ def start_case_0(Matrix_A,epsilon,Anzahl_neue_Indizes_J_pro_Iteration,M_default,
         M = set_m_to_M(m_tilde,i,M,J)                                                            #Die aktuelle Näherung an die i-te Spalte der inversen Matrix wird in M abgespeichert
     return [iterations,M]
     
-def start_case_1(Matrix_A,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M):
+def start_case_1(Matrix_A,max_fillin,new_Indices,M_default,M):
     iterations = 0
     Dimension = Matrix_A.shape[0]
     [Positions_nonzero,Matrix_A] = positions_nonzeros(Matrix_A,Dimension)
@@ -96,8 +97,8 @@ def start_case_1(Matrix_A,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_defau
         current_residual = retransform_residual(residual,I,Dimension)
         iterations = iterations +1
         print(iterations)
-        while((len(J) + Anzahl_neue_Indizes_J_pro_Iteration) <= max_fillin and Simulation):
-            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,Anzahl_neue_Indizes_J_pro_Iteration,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
+        while((len(J) + new_Indices) <= max_fillin and Simulation):
+            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,new_Indices,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
             I_tilde = set_I_tilde(Matrix_A,J_tilde,I,J)
             if(control_lists(I_tilde,J_tilde)):
                 [Q,R] = compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R)                              #Die neuen Bestandteile Q und R der QR-Zerlegung werden geupdatet (keine komplett neue QR-Zerlegung)
@@ -113,7 +114,7 @@ def start_case_1(Matrix_A,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_defau
         M = set_m_to_M(m_tilde,i,M,J)                                                            #Die aktuelle Näherung an die i-te Spalte der inversen Matrix wird in M abgespeichert
     return [iterations,M]
 
-def start_case_2(Matrix_A,epsilon,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M):
+def start_case_2(Matrix_A,epsilon,max_fillin,new_Indices,M_default,M):
     iterations = 0
     Dimension = Matrix_A.shape[0]
     [Positions_nonzero,Matrix_A] = positions_nonzeros(Matrix_A,Dimension)
@@ -139,12 +140,13 @@ def start_case_2(Matrix_A,epsilon,max_fillin,Anzahl_neue_Indizes_J_pro_Iteration
         
         iterations = iterations +1
         print(iterations)
-        while(((len(J) + Anzahl_neue_Indizes_J_pro_Iteration) <= max_fillin) and (current_norm_residual > epsilon) and Simulation):
-            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,Anzahl_neue_Indizes_J_pro_Iteration,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
+        while(((len(J) + new_Indices) <= max_fillin) and (current_norm_residual > epsilon) and Simulation):
+            J_tilde = new_Indizes_J_Minimization_problem(Matrix_A,new_Indices,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual)                           #beste Kandidaten werden zu J_tilde hinzugefügt
             I_tilde = set_I_tilde(Matrix_A,J_tilde,I,J)
             if(control_lists(I_tilde,J_tilde)):
                 [Q,R] = compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R)                              #Die neuen Bestandteile Q und R der QR-Zerlegung werden geupdatet (keine komplett neue QR-Zerlegung)
                 [I,J] = unite_sets(I,J,I_tilde,J_tilde)
+                #[Q,R] = compute_QR_decomposition(I,J,Matrix_A)
                 e_i_tilde = unit_vector_tilde(i,I)
                 m_tilde  = R_backwards_solver(i,Q,R,len(J),I)
                 residual = (Matrix_A[I,:])[:,J]@m_tilde - e_i_tilde          #evtl Matrix_A[I,J]@m und dann vom i-ten eintrag noch 1 abziehen für Effizienz
@@ -240,7 +242,7 @@ def array_of_candidates(J_tilde,Matrix_A,current_residual,l,norm_squared_cols,I,
         i = i+1
     return [array_kandidaten_und_Werte,i]
 
-def new_Indizes_J_Minimization_problem(Matrix_A,Anzahl_neue_Indizes_J_pro_Iteration,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual): #neue Indizes werden über 1-dim Minproblem bestimmt
+def new_Indizes_J_Minimization_problem(Matrix_A,new_Indices,current_residual,J,Positions_nonzero,norm_squared_cols,I,residual): #neue Indizes werden über 1-dim Minproblem bestimmt
     
     
     [J_tilde] = set_J_tilde(Matrix_A,current_residual,J,Positions_nonzero)
@@ -253,13 +255,13 @@ def new_Indizes_J_Minimization_problem(Matrix_A,Anzahl_neue_Indizes_J_pro_Iterat
     int_kandidaten = []
 
     array_kandidaten_und_Werte = array_kandidaten_und_Werte[array_kandidaten_und_Werte[:,0].argsort()]                            #Es wird nach dem kleinsten Residuum sortiert
-    if (Anzahl_neue_Indizes_J_pro_Iteration >= i):                    #weil es weniger Kandidaten geben könnte als maximal möglich wären, würden alle hinzugefügt werden. Im Fall großer Matrizen eher unwahrscheinlich
+    if (new_Indices>= i):                    #weil es weniger Kandidaten geben könnte als maximal möglich wären, würden alle hinzugefügt werden. Im Fall großer Matrizen eher unwahrscheinlich
 
         for k in range(0,i):
             int_kandidaten.append(int(array_kandidaten_und_Werte[k][1]))       
     
     else:
-        for k in range(0,Anzahl_neue_Indizes_J_pro_Iteration):
+        for k in range(0,new_Indices):
             int_kandidaten.append(int(array_kandidaten_und_Werte[k][1]))
 
     J_tilde = np.sort(int_kandidaten,0)                 #Die Indizes werden noch sortiert
@@ -293,6 +295,12 @@ def R_backwards_solver(index_k,Q,R,l,I):            #R ist obere Dreicksmatrix
 
     return m
 
+def inner(x):                   #Methode zur Bestimmung des Skalarprodukts mit sich selbst
+    
+    inner = 0
+    for i in x.data:
+        inner = inner + i*i
+    return inner
 
 def compute_QR_decomposition(I,J,Matrix_A):
         
@@ -310,6 +318,7 @@ def compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R):
     n_2 = len(J)
     n_1_tilde = len(I_tilde)
     n_2_tilde = len(J_tilde)
+    
     temp = Q.T@(Matrix_A[I,:])[:,J_tilde]
     
     Q1 = np.zeros((n_1 + n_1_tilde,n_1 + n_1_tilde))
@@ -334,7 +343,7 @@ def compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R):
     B_2[(n_1-n_2):(n_1-n_2+n_1_tilde),0:n_2_tilde] = (Matrix_A[I_tilde,:])[:,J_tilde].toarray()
 
     [Q_1,R_1] = np.linalg.qr(B_2,"complete")            #Die neue kleine QR-Zerlegung
-        
+   #     
     Q2[n_2:n_1 + n_1_tilde,n_2:n_1 + n_1_tilde] = Q_1
     R_neu[n_2:n_2 + n_2_tilde,n_2:n_2 + n_2_tilde] = R_1[0:n_2_tilde,0:n_2_tilde]
     
@@ -342,7 +351,12 @@ def compose_QR_decomposition(I,J,I_tilde,J_tilde,Matrix_A,Q,R):
     
 
     Q = Q1@Q2
+    
+    #[Q,R_ganz] = np.linalg.qr((Matrix_A[I.extend(I_tilde),:])[:,J.extend(J_tilde)].toarray(),"complete")
+    #R_neu = R[0:n_2+n_2_tilde,0:n_2+n_2_tilde]
+    
     return [Q,R_neu]
+    
     
 def control_lists(I,J):                     #kontrolliert, ob eine Menge leer ist und damit die weitere Berechnung unnötig ist
     #print(I,J,"I und J")
@@ -355,20 +369,21 @@ def control_lists(I,J):                     #kontrolliert, ob eine Menge leer is
 def load_Matrix_A(level):
     Matrix_A = load_data(level)
     Dimension = Matrix_A.shape[0]
-    M_default = sparse.eye(Dimension).tocsc()       #sparse.lil_matrix((self.Dimension,self.Dimension))
+    
     M = sparse.lil_matrix((Dimension,Dimension))
-        
+
+    M_default = sparse.eye(Dimension).tocsc()       #sparse.lil_matrix((self.Dimension,self.Dimension))
+
     return [Matrix_A,M_default,M]
     
 
 
 if __name__ == "__main__":
     
-    epsilon = 0.8                               #obere Schranke Abbruchkriterium Residuum ||r-Am||
-    max_fillin = 2                           #obere Schranke an Einträgen in den Spalten aus M
-    case = 2                                    #Die Art des Abbruchkriteriums... Kombiniert?
-    Anzahl_neue_Indizes_J_pro_Iteration = 4     #Anzahl an neuen Einträgen, die pro Iterationsschritt zu J hinzugefügt werden 
-    
+    epsilon = 0.1                              #obere Schranke Abbruchkriterium Residuum ||r-Am||
+    max_fillin = 6                           #obere Schranke an Einträgen in den Spalten aus M
+    case = 0                                    #Die Art des Abbruchkriteriums... Kombiniert?
+    new_Indices= 3    #Anzahl an neuen Einträgen, die pro Iterationsschritt zu J hinzugefügt werden 
     
     Dauer_SPAI = []
     Dauer_SPAI_Prec = []
@@ -378,16 +393,26 @@ if __name__ == "__main__":
     dimensions = []
     
     
-    for i in range(1,6):                                                                             
+    for i in range(3,4):                                                                             
         [Matrix_A,M_default,M] = load_Matrix_A(i)
-        Matrix_A = Matrix_A.tocsc()
+        Dimension = Matrix_A.shape[0]
+        Matrix_A.tocsc()
         Matrix_A.eliminate_zeros()
         np.set_printoptions(formatter={'float': lambda x: "{0:0.1f}".format(x)})
     
         
-        [iterations,duration,M] = Start(Matrix_A,epsilon,max_fillin,case,Anzahl_neue_Indizes_J_pro_Iteration,M_default,M)
+        [iterations,duration,M] = Start(Matrix_A,epsilon,max_fillin,case,new_Indices,M_default,M)
         print(iterations, " Iterationen")
         print(duration, " Dauer")
+        
+        time_1 = time.time()
+        spilu = sp.spilu(Matrix_A)
+        solver = lambda x : spilu.solve(x) 
+        M_1 = sp.LinearOperator((Dimension,Dimension), solver)
+        time_2 = time.time()
+        diff = time_2 - time_1
+        print(diff,"Dauer")
+        Matrix_A = Matrix_A.tocsc()
         
         iterationen.append(iterations)
         Dauer_SPAI.append(duration)
@@ -404,8 +429,10 @@ if __name__ == "__main__":
         print(info)   
         Dauer_ohne_Prec.append(diff)
         
+        Test = (Matrix_A@M).tocsr()
         time_1 = time.time()
-        [x,info] = sp.gmres(Matrix_A,np.ones(Dimension),M = M.tocsr())
+        [x,info] = sp.gmres(Test,np.ones(Dimension))
+        x = M@x
         time_2 = time.time()
         diff = time_2-time_1
         print(diff,"GMRES mit SPAI-Preconditioning")
@@ -413,42 +440,46 @@ if __name__ == "__main__":
         Dauer_SPAI_Prec.append(diff)
         
         
-        Matrix_A.tocsc()
+        Matrix_A.tocsr()
+        time_1 = time.time()
         spilu = sp.spilu(Matrix_A)
         solver = lambda x : spilu.solve(x) 
         M = sp.LinearOperator((Dimension,Dimension), solver)
+        time_2 = time.time()
+        diff = time_2 - time_1
+        print(diff,"Dauer")
         time_1 = time.time()
-        [x,info] = sp.gmres(Matrix_A,np.ones(Dimension),M = M)
+        [x_2,info] = sp.gmres(Matrix_A,np.ones(Dimension),M = M_1)
         time_2 = time.time()
         diff = time_2-time_1
         print(diff,"GMRES mit ILU-Preconditioning")
         print(info)
         Dauer_ILU_Prec.append(diff)
         
-        
-        
+        print(np.linalg.norm(x - x_2),"norm")
+        #print(np.linalg.norm(Test,ord = 'fro'),'normm')
     
     
-    print(Dauer_SPAI_Prec,"Dauer_SPAI_Prec")
-    print(Dauer_SPAI,"Dauer_SPAI")
-    print(Dauer_ohne_Prec,"Dauer_ohne_Prec")
-    print(Dauer_ILU_Prec,"Dauer_ILU_Prec")
-    print(iterationen,"iterationen")
-    
-    print(dimensions)
-    print(Dauer_SPAI)
-    
-    plt.clf()
-    plt.figure(1)
-    plt.plot(dimensions,Dauer_SPAI,"ro")
-    plt.show()
-    
-    #plt.clf()
-    plt.figure(2)
-    plt.plot(dimensions,Dauer_ohne_Prec,"bo")#,label="Dauer_ohne_Prec")
-    plt.plot(dimensions,Dauer_SPAI_Prec,"ro")#,label="SPAI_Dauer_Prec")
-    plt.plot(dimensions,Dauer_ILU_Prec,"yo")#,label="ILU_Dauer_Prec")
-    plt.show()
+    #print(Dauer_SPAI_Prec,"Dauer_SPAI_Prec")
+    ##print(Dauer_SPAI,"Dauer_SPAI")
+    #print(Dauer_ohne_Prec,"Dauer_ohne_Prec")
+    #print(Dauer_ILU_Prec,"Dauer_ILU_Prec")
+    #print(iterationen,"iterationen")
+   # 
+   # print(dimensions)
+   # print(Dauer_SPAI)
+   # 
+   # plt.clf()
+   # plt.figure(1)
+   # plt.plot(dimensions,Dauer_SPAI,"ro")
+   # plt.show()
+   # 
+   # #plt.clf()
+   # plt.figure(2)
+   # plt.plot(dimensions,Dauer_ohne_Prec,"bo")#,label="Dauer_ohne_Prec")
+   # plt.plot(dimensions,Dauer_SPAI_Prec,"ro")#,label="SPAI_Dauer_Prec")
+   # plt.plot(dimensions,Dauer_ILU_Prec,"yo")#,label="ILU_Dauer_Prec")
+   # plt.show()
     
     
     

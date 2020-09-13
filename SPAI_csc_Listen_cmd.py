@@ -372,7 +372,8 @@ if __name__ == "__main__":
     level = int(sys.argv[5])
     
     print("Der Algorithmus wird gestartet mit den Parametern \n " "epsilon = ",epsilon,"\n max_fillin = ",max_fillin,"\n case = ",case,"\n level = ",level,"\n Anzahl_neue_Indizes_J_pro_Iteration = ",Anzahl_neue_Indizes_J_pro_Iteration)
-    time.sleep(4)
+    
+    #time.sleep(4)
     Dauer_SPAI = []
     Dauer_SPAI_Prec = []
     Dauer_ohne_Prec = []
